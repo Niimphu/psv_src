@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://kfm27y8b5440"]
+
+[ext_resource type="Script" path="res://Bar.gd" id="1_eutgs"]
+
+[node name="Bar" type="Polygon2D"]
+polygon = PackedVector2Array(0, 0, 0, 1, 1, 1, 1, 0)
+script = ExtResource("1_eutgs")
