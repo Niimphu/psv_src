@@ -64,21 +64,20 @@ func generate_bars():
 	update_bars_position()
 	update_colour()
 
+
 func update_bars_size():
 	var bars = bars_a.get_children() + bars_b.get_children()
 	var min_bar_length: float
-	var increment
 	
-	window_size = get_window().get_size()
+	window_size = Vector2i(1920, 1080)
 	bar_height = window_size.y / float(stack_size)
-	max_bar_length = 0.48 * window_size.x
+	max_bar_length = 0.49 * window_size.x
 	if stack_size > 10:
-		min_bar_length = max_bar_length * 0.01
+		min_bar_length = max_bar_length * 0.015
 	else:
 		min_bar_length = 50.0
-	increment = (max_bar_length - min_bar_length) / stack_size
 	for bar in bars:
-		bar.scale.x = bar.index * increment
+		bar.scale.x = lerp(min_bar_length, max_bar_length, bar.index / stack_size)
 		bar.scale.y = bar_height
 
 
@@ -153,23 +152,6 @@ func _on_Visualise_pressed():
 
 
 func visualise(visualising):
-#	var steps_per_second_input = speed_input.text
-#	if not steps_per_second_input.is_valid_float():
-#		display.update_display("Invalid steps per second")
-#		return
-#	speed = 1 / float(steps_per_second_input)
-#	if speed > 1000:
-#		display.update_display("Invalid steps per second (max 1000)")
-#		return
-#	if speed < -1000:
-#		display.update_display("Invalid steps per second (max 500)")
-#		return
-#	if speed < 0:
-#		is_reverse = true
-#		speed = abs(speed)
-#	else:
-#		is_reverse = false
-#	speed_timer.wait_time = speed
 	if not visualising:
 		speed_timer.stop()
 	else:
@@ -211,7 +193,7 @@ func simplify():
 		for i in range(stack_a.size()):
 			stack_a[i] -= stack_min - 1
 	var next = 2
-	while stack_a.max() != stack_size: #this is ugly :(
+	while stack_a.max() != stack_size:
 		stack_min = lowest_number_great_than(stack_a, next)
 		if not stack_a.has(next):
 			for i in range(stack_a.size()):
@@ -434,7 +416,6 @@ func rev_rotate_b():
 
 
 func _on_speed_slider_value_changed(value):
-	var slider = get_node("Control/Menu/HBoxContainer2/HBoxContainer/MenuItems/VBoxContainer/GridContainer/SpeedSlider")
 	if abs(value) > 1.0:
 		steps_per_second_input = value
 	elif value > 0.0:
