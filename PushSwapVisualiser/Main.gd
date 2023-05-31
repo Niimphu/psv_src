@@ -8,7 +8,6 @@ extends Node2D
 @onready var bars_b = get_node("BarsB")
 @onready var window_size = get_window().get_size_with_decorations()
 @onready var bar_height = window_size.y / stack_size
-@onready var speed_timer = $Speed
 
 var stack_size = 3
 var values = [42, -1, 69]
@@ -18,16 +17,28 @@ var values_as_string = "42 -1 69"
 var max_bar_length
 var bar_scene = load("res://Bar.tscn")
 var commands = []
-var speed = 1.0
 var reversing: bool = false
-var is_visualising: bool = false
+var is_loop_stopped: bool = true
 var cmd_index = 0
-var steps_per_second_input = 1
 var colour_index = 0
+var time_step = 1000
+var time_left = time_step
 
 
 func _ready():
 	fit_window_to_screen()
+	menu_button.modulate.a = 0.4
+
+
+func _physics_process(_delta):
+	if is_loop_stopped:
+		return
+	if time_left > 0:
+		time_left -= 10
+	else:
+		step(reversing)
+		time_left = time_step
+
 
 func fit_window_to_screen():
 	var screen_size = DisplayServer.screen_get_size()
@@ -35,7 +46,6 @@ func fit_window_to_screen():
 	if window_size.x > screen_size.x or window_size.y > screen_size.y:
 		get_window().set_size(screen_size)
 	
-	menu_button.modulate.a = 0.4
 
 
 func generate_values():
@@ -109,10 +119,9 @@ func _on_Compute_pressed():
 		return
 	
 	OS.execute(push_swap, args)
-#	await get_tree().create_timer(stack_size * 0.0001).timeout
 	ps_out = FileAccess.open("ps_out", FileAccess.READ)
 	if !ps_out:
-		display.update_display("Failed to open: ps_out")
+		display.update_display("Error")
 		return
 	else:
 		var count = cmd_count(ps_out)
@@ -145,20 +154,10 @@ func save_commands(file):
 		command = file.get_line()
 
 
-func _on_Visualise_pressed():
-	menu_button.button_pressed = false
-	is_visualising = true
-	visualise(is_visualising)
-
-
-func visualise(visualising):
-	if not visualising:
-		speed_timer.stop()
-	else:
-		speed_timer.start()
-
-
 func _on_generate_pressed():
+	stack_a.clear()
+	stack_b.clear()
+	values.clear()
 	for n in bars_a.get_children():
 		bars_a.remove_child(n)
 		n.queue_free()
@@ -211,35 +210,47 @@ func lowest_number_great_than(arr, n):
 
 
 func _on_play_pause_pressed():
-	is_visualising = true if is_visualising == false else false
-	visualise(is_visualising)
+	if is_loop_stopped:
+		is_loop_stopped = false
+		_on_menu_button_toggled(false)
+	else:
+		is_loop_stopped = true
 
 
 func _on_reset_pressed():
 	cmd_index = 0
-	is_visualising = false
-	visualise(is_visualising)
-	stack_a = []
-	stack_b = []
+	is_loop_stopped = true
 	_on_generate_pressed()
 	_on_Compute_pressed()
 	
 
-func _on_speed_timeout():
-	if commands.size() == 0:
-		speed_timer.stop()
-		is_visualising == false
-		return
-	step(reversing)
-
 
 func step(is_reverse):
-	var command = commands[cmd_index]
+	if cmd_index >= commands.size() and not is_reverse:
+		cmd_index = commands.size() - 1
+		is_loop_stopped = true
+		return
+	if cmd_index <= 0 and is_reverse:
+		cmd_index = 0
+		is_loop_stopped = true
+		return
 	
-	if (cmd_index == 0 and is_reverse) or (cmd_index == commands.size() - 1 and not is_reverse):
-		speed_timer.stop()
-		is_visualising = false
 	
+	var command = ""
+	if not is_reverse:
+		command = commands[cmd_index]
+		cmd_index += 1
+		cmd_state_machine(command, is_reverse)
+	else:
+		cmd_index -= 1
+		command = commands[cmd_index]
+		cmd_state_machine(command, is_reverse)
+	
+	update_bars_position()
+	update_commands()
+	
+
+func cmd_state_machine(command, is_reverse):
 	match command:
 		"sa":
 			swap_a()
@@ -294,15 +305,6 @@ func step(is_reverse):
 				rotate_b()
 		_:
 			display.update_display("Invalid command: ", command)
-	
-	update_bars_position()
-	if not is_reverse and is_visualising:
-		cmd_index += 1
-	update_commands()
-	if is_reverse and is_visualising:
-		cmd_index -= 1
-	
-
 
 func update_commands():
 	var queue = get_node("Control/Menu/HBoxContainer2/HBoxContainer/MenuItems/VBoxContainer/Queue")
@@ -415,22 +417,6 @@ func rev_rotate_b():
 	bars_b.move_child(moved, 0)
 
 
-func _on_speed_slider_value_changed(value):
-	if abs(value) > 1.0:
-		steps_per_second_input = value
-	elif value > 0.0:
-		steps_per_second_input = 1.0
-	else:
-		steps_per_second_input = -1.0
-	speed = 1.0 / float(steps_per_second_input)
-	if speed < 0.0:
-		reversing = true
-		speed = abs(speed)
-	else:
-		reversing = false
-	speed_timer.wait_time = speed
-
-
 func _on_option_button_item_selected(index):
 	colour_index = index
 	update_colour()
@@ -504,10 +490,34 @@ func update_colour():
 
 
 func _on_step_forward_pressed():
-	if not is_visualising:
+	if is_loop_stopped:
 		step(false)
 
 
 func _on_step_backward_pressed():
-	if not is_visualising:
+	if is_loop_stopped:
 		step(true)
+
+
+func _on_reverse_toggled(button_pressed):
+	reversing = button_pressed
+
+
+func _on_speed_item_selected(index):
+	match index:
+		0:
+			time_step = 1000
+		1:
+			time_step = 1000 / 2
+		2:
+			time_step = 1000 / 5
+		3:
+			time_step = 1000 / 10
+		4:
+			time_step = 1000 / 100
+		5:
+			time_step = 1000 / 250
+		6:
+			time_step = 1000 / 1000
+			
+
