@@ -205,6 +205,7 @@ theme_override_colors/font_color = Color(1, 1, 1, 1)
 script = ExtResource("6_sy3gq")
 
 [node name="DisplayTimer" type="Timer" parent="Control/Menu/HBoxContainer2/HBoxContainer/MenuItems/VBoxContainer/Output"]
+wait_time = 5.0
 
 [node name="HSeparator3" type="HSeparator" parent="Control/Menu/HBoxContainer2/HBoxContainer/MenuItems/VBoxContainer"]
 layout_mode = 2

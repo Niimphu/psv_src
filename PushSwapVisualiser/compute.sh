@@ -1,5 +1,5 @@
 #!/bin/bash
 
-push_swap=.././push_swap
+./$1 $2  > ps_out
 
-"$push_swap" $1 > ps_out
+echo "done"

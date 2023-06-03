@@ -23,11 +23,13 @@ var cmd_index = 0
 var colour_index = 0
 var time_step = 1000
 var time_left = time_step
+var push_swap = null
 
 
 func _ready():
 	fit_window_to_screen()
 	menu_button.modulate.a = 0.4
+	get_viewport().files_dropped.connect(on_files_dropped)
 
 
 func _physics_process(_delta):
@@ -104,34 +106,56 @@ func update_bars_position():
 			b_bars[i].position.x = window_size.x / 2
 
 
+
+func on_files_dropped(files):
+	if files.size() < 1:
+		display.update_display("No file detected, please try again")
+	if not files[0].ends_with("push_swap"):
+		display.update_display("Invalid file: please drag your push_swap into this window")
+		return
+	push_swap = files[0]
+	clear_display()
+
+
+func clear_display():
+	display.update_display("")
+
+
+
 func _on_Compute_pressed():
-	var push_swap = "./compute.sh"
-	var ps_out: FileAccess
-	var args = [values_as_string]
-	
 	if stack_a.is_empty():
-		display.update_display("No values generated")
+		display.update_display("No values generated: please click 'Generate'")
+		return
+#
+#	var file_check = push_swap
+	if push_swap == null:
+		display.update_display("Missing push_swap: please drag your push_swap into this window")
 		return
 	
-	var file_check = FileAccess.file_exists(push_swap)
-	if !file_check:
-		display.update_display("Missing push_swap executable")
-		return
+	var args = [values_as_string]
+	var out = []
+	OS.execute(push_swap, args, out)
+#	OS.execute("compute.sh", args, out)
+#	var ps_out: FileAccess.open("ps_out", FileAccess.READ)
+#	if !ps_out:
+#		display.update_display("Error")
+#		return
+#	else:
+#		var count = cmd_count(ps_out)
+#		var counter = " steps"
+#		if count == 1:
+#			counter = " step"
+#		display.update_display(str(count) + counter)
+	var count = out.size()
+	var counter = " steps"
+	if count == 1:
+		counter = " step"
+	display.update_display(str(count) + counter)
 	
-	OS.execute(push_swap, args)
-	ps_out = FileAccess.open("ps_out", FileAccess.READ)
-	if !ps_out:
-		display.update_display("Error")
-		return
-	else:
-		var count = cmd_count(ps_out)
-		var counter = " steps"
-		if count == 1:
-			counter = " step"
-		display.update_display(str(count) + counter)
-	save_commands(ps_out)
-	DirAccess.remove_absolute(ps_out.get_path_absolute())
-	ps_out.close()
+#	save_commands(ps_out)
+	commands = out
+#	DirAccess.remove_absolute(ps_out.get_path_absolute())
+#	ps_out.close()
 	
 	update_commands()
 	cmd_index = 0
@@ -212,7 +236,7 @@ func lowest_number_great_than(arr, n):
 func _on_play_pause_pressed():
 	if is_loop_stopped:
 		is_loop_stopped = false
-		_on_menu_button_toggled(false)
+		menu_button.button_pressed = false
 	else:
 		is_loop_stopped = true
 
