@@ -21,7 +21,7 @@ var reversing: bool = false
 var is_loop_stopped: bool = true
 var cmd_index = 0
 var colour_index = 0
-var time_step = 1000
+var time_step = 1000.0
 var time_left = time_step
 var push_swap = null
 
@@ -35,8 +35,8 @@ func _ready():
 func _physics_process(_delta):
 	if is_loop_stopped:
 		return
-	if time_left > 0:
-		time_left -= 10
+	if time_left > 0.0:
+		time_left -= 10.0
 	else:
 		step(reversing)
 		time_left = time_step
@@ -146,12 +146,12 @@ func _on_Compute_pressed():
 #		if count == 1:
 #			counter = " step"
 #		display.update_display(str(count) + counter)
+	out = out[0].split("\n")
 	var count = out.size()
 	var counter = " steps"
 	if count == 1:
 		counter = " step"
 	display.update_display(str(count) + counter)
-	
 #	save_commands(ps_out)
 	commands = out
 #	DirAccess.remove_absolute(ps_out.get_path_absolute())
@@ -530,18 +530,18 @@ func _on_reverse_toggled(button_pressed):
 func _on_speed_item_selected(index):
 	match index:
 		0:
-			time_step = 1000
+			time_step = 1000.0
 		1:
-			time_step = 1000 / 2
+			time_step = 1000.0 / 2.0
 		2:
-			time_step = 1000 / 5
+			time_step = 1000.0 / 5.0
 		3:
-			time_step = 1000 / 10
+			time_step = 1000.0 / 10.0
 		4:
-			time_step = 1000 / 100
+			time_step = 1000.0 / 100.0
 		5:
-			time_step = 1000 / 250
+			time_step = 1000.0 / 250.0
 		6:
-			time_step = 1000 / 1000
+			time_step = 1000.0 / 1000.0
 			
 
