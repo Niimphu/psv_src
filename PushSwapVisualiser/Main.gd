@@ -13,17 +13,16 @@ var stack_size = 3
 var values = [42, -1, 69]
 var stack_a = []
 var stack_b = []
-var values_as_string = "42 -1 69"
 var max_bar_length
 var bar_scene = load("res://Bar.tscn")
 var commands = []
 var reversing: bool = false
-var is_loop_stopped: bool = true
-var cmd_index = 0
+var is_program_stopped: bool = true
+var command_i = 0
 var colour_index = 0
-var time_step = 1000.0
-var time_left = time_step
+var step_interval = 1 / 2.0
 var push_swap = null
+var time_since_stepped = 0.0
 
 
 func _ready():
@@ -32,14 +31,20 @@ func _ready():
 	get_viewport().files_dropped.connect(on_files_dropped)
 
 
-func _physics_process(_delta):
-	if is_loop_stopped:
+func _process(delta):
+	if is_program_stopped:
 		return
-	if time_left > 0.0:
-		time_left -= 10.0
-	else:
-		step(reversing)
-		time_left = time_step
+	time_since_stepped += delta
+	if time_since_stepped >= step_interval:
+		var step_count = floor(time_since_stepped / step_interval)
+		if step_count > 200.0:
+			step_count = 200
+			time_since_stepped = 0.0
+		time_since_stepped -= step_count * step_interval
+		for _step in range(step_count):
+			if is_program_stopped:
+				return
+			step(reversing)
 
 
 func fit_window_to_screen():
@@ -54,17 +59,12 @@ func generate_values():
 	var new_value
 	
 	values.clear()
-	values_as_string = ""
 	randomize()
 	while values.size() < stack_size:
 		new_value = randi() % (2147483647 * 2 + 1) - 2147483648
 		if not values.has(new_value):
 			values.append(new_value)
-		
-		if values_as_string == "":
-			values_as_string = str(new_value)
-		else:
-			values_as_string += " " + str(new_value)
+
 
 
 func generate_bars():
@@ -108,9 +108,10 @@ func update_bars_position():
 
 
 func on_files_dropped(files):
+	print(files[0])
 	if files.size() < 1:
 		display.update_display("No file detected, please try again")
-	if not files[0].ends_with("push_swap"):
+	if not (files[0].ends_with("push_swap") or files[0].ends_with("push_swap.exe")):
 		display.update_display("Invalid file: please drag your push_swap into this window")
 		return
 	push_swap = files[0]
@@ -126,39 +127,29 @@ func _on_Compute_pressed():
 	if stack_a.is_empty():
 		display.update_display("No values generated: please click 'Generate'")
 		return
-#
-#	var file_check = push_swap
+
 	if push_swap == null:
 		display.update_display("Missing push_swap: please drag your push_swap into this window")
 		return
 	
-	var args = [values_as_string]
 	var out = []
-	OS.execute(push_swap, args, out)
-#	OS.execute("compute.sh", args, out)
-#	var ps_out: FileAccess.open("ps_out", FileAccess.READ)
-#	if !ps_out:
-#		display.update_display("Error")
-#		return
-#	else:
-#		var count = cmd_count(ps_out)
-#		var counter = " steps"
-#		if count == 1:
-#			counter = " step"
-#		display.update_display(str(count) + counter)
-	out = out[0].split("\n")
+	OS.execute(push_swap, values, out)
+	
+	var delimiter: String
+	if OS.get_name() == "Windows":
+		delimiter = "\r\n"
+	else:
+		delimiter = "\n"
+	out = out[0].split(delimiter)
 	var count = out.size()
 	var counter = " steps"
 	if count == 1:
 		counter = " step"
 	display.update_display(str(count) + counter)
-#	save_commands(ps_out)
-	commands = out
-#	DirAccess.remove_absolute(ps_out.get_path_absolute())
-#	ps_out.close()
 	
+	commands = out
 	update_commands()
-	cmd_index = 0
+	command_i = 0
 
 
 func cmd_count(file):
@@ -234,40 +225,40 @@ func lowest_number_great_than(arr, n):
 
 
 func _on_play_pause_pressed():
-	if is_loop_stopped:
-		is_loop_stopped = false
+	if is_program_stopped:
+		is_program_stopped = false
 		menu_button.button_pressed = false
 	else:
-		is_loop_stopped = true
+		is_program_stopped = true
 
 
 func _on_reset_pressed():
-	cmd_index = 0
-	is_loop_stopped = true
+	command_i = 0
+	is_program_stopped = true
 	_on_generate_pressed()
 	_on_Compute_pressed()
 	
 
 
 func step(is_reverse):
-	if cmd_index >= commands.size() and not is_reverse:
-		cmd_index = commands.size() - 1
-		is_loop_stopped = true
+	if command_i >= commands.size() and not is_reverse:
+		command_i = commands.size() - 1
+		is_program_stopped = true
 		return
-	if cmd_index <= 0 and is_reverse:
-		cmd_index = 0
-		is_loop_stopped = true
+	if command_i <= 0 and is_reverse:
+		command_i = 0
+		is_program_stopped = true
 		return
 	
 	
 	var command = ""
 	if not is_reverse:
-		command = commands[cmd_index]
-		cmd_index += 1
+		command = commands[command_i]
+		command_i += 1
 		cmd_state_machine(command, is_reverse)
 	else:
-		cmd_index -= 1
-		command = commands[cmd_index]
+		command_i -= 1
+		command = commands[command_i]
 		cmd_state_machine(command, is_reverse)
 	
 	update_bars_position()
@@ -328,19 +319,20 @@ func cmd_state_machine(command, is_reverse):
 				rotate_a()
 				rotate_b()
 		_:
-			display.update_display("Invalid command: ", command)
+			if command != "":
+				display.update_display("Invalid command: ", command)
 
 func update_commands():
 	var queue = get_node("Control/Menu/HBoxContainer2/HBoxContainer/MenuItems/VBoxContainer/Queue")
 	var display_text = ""
 	for n in range(9):
-		if cmd_index + n >= commands.size():
+		if command_i + n >= commands.size():
 			break
-		if commands[cmd_index + n]:
+		if commands[command_i + n]:
 			if n == 0:
-				display_text = commands[cmd_index]
+				display_text = commands[command_i]
 			else:
-				display_text += "\n" + commands[cmd_index + n]
+				display_text += "\n" + commands[command_i + n]
 	queue.text = display_text
 	
 
@@ -514,12 +506,12 @@ func update_colour():
 
 
 func _on_step_forward_pressed():
-	if is_loop_stopped:
+	if is_program_stopped:
 		step(false)
 
 
 func _on_step_backward_pressed():
-	if is_loop_stopped:
+	if is_program_stopped:
 		step(true)
 
 
@@ -530,18 +522,18 @@ func _on_reverse_toggled(button_pressed):
 func _on_speed_item_selected(index):
 	match index:
 		0:
-			time_step = 1000.0
+			step_interval = 1 / 2.0
 		1:
-			time_step = 1000.0 / 2.0
+			step_interval = 1 / 4.0
 		2:
-			time_step = 1000.0 / 5.0
+			step_interval = 1 / 10.0
 		3:
-			time_step = 1000.0 / 10.0
+			step_interval = 1 / 50.0
 		4:
-			time_step = 1000.0 / 100.0
+			step_interval = 1 / 200.0
 		5:
-			time_step = 1000.0 / 250.0
+			step_interval = 1 / 1000.0
 		6:
-			time_step = 1000.0 / 1000.0
+			step_interval = 1 / 2000.0
 			
 
