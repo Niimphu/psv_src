@@ -1,4 +1,2 @@
 res://default_env.tres
-res://Main.tscn
-res://Main.gd
-res://Output.gd
+res://Bar.tscn
